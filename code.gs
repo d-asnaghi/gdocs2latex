@@ -155,20 +155,31 @@ function processParagraph(index, element, inSrc, imageCounter, listCounters) {
   var imagePrefix = "image_";
   
   // Handle Table elements. Pretty simple-minded now, but works for simple tables.
-  // Note that Markdown does not process within block-level HTML, so it probably 
-  // doesn't make sense to add markup within tables.
+  // Note: Needs \usepackage{tabular}
   if (element.getType() === DocumentApp.ElementType.TABLE) {
-    textElements.push("<table>\n");
+    // Beginning of table
+    textElements.push("\\begin{table}\n\\centering\n\\begin{tabular}{@{}");
     var nCols = element.getChild(0).getNumCells();
+    for (var i = 0; i<nCols; i++)
+      textElements.push("c");
+    // Top Line
+    textElements.push("@{}}\n\\toprule\n");
+    // Process column
     for (var i = 0; i < element.getNumChildren(); i++) {
-      textElements.push("  <tr>\n");
-      // process this row
-      for (var j = 0; j < nCols; j++) {
-        textElements.push("    <td>" + element.getChild(i).getChild(j).getText() + "</td>\n");
+      // Middle line
+      if (i == 1)
+          textElements.push("\\midrule\n");
+      textElements.push("\t");
+      // Process row
+      for (var j = 0; j < nCols-1; j++) {
+        // Get formatting of single element and add it to the row
+        textElements.push(processTextElement("", element.getChild(i).getChild(j).asText()) + "\t&\t");
       }
-      textElements.push("  </tr>\n");
+      // Add the final element to the row
+      textElements.push(processTextElement("", element.getChild(i).getChild(j).asText()) + " \\\\\n");
     }
-    textElements.push("</table>\n");
+    // End of table with bottom line
+    textElements.push("\\bottomrule\n\\end{tabular}\n\\end{table}\n");
   }
   
   // Process various types (ElementType).
@@ -200,7 +211,7 @@ function processParagraph(index, element, inSrc, imageCounter, listCounters) {
       }
       var name = imagePrefix + imageCounter + extension;
       imageCounter++;
-      textElements.push('![image alt text]('+name+')');
+      textElements.push('\\begin{figure}\n\\centering\n\\includegraphics[width=0.5\\textwidth]{example-image}\n\\caption{'+processLatex(name)+'}\n\\end{figure}\n');
       result.images.push( {
         "bytes": element.getChild(i).getBlob().getBytes(), 
         "type": contentType, 
@@ -219,9 +230,10 @@ function processParagraph(index, element, inSrc, imageCounter, listCounters) {
       textElements.push('\\footnote{'+note+'}');
     
     } else {  
-      // UNSUPPORTED
-      throw "Paragraph "+index+" of type "+element.getType()+" has an unsupported child: "
-      +t+" "+(element.getChild(i)["getText"] ? element.getChild(i).getText():'')+" index="+index;
+      // UNSUPPORTED ELEMENT
+      // Following error is for debug purpose only
+      //throw "Paragraph "+index+" of type "+element.getType()+" has an unsupported child: "
+      //+t+" "+(element.getChild(i)["getText"] ? element.getChild(i).getText():'')+" index="+index;
     }
   }
 
